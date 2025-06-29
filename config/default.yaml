@@ -1,0 +1,124 @@
+# AALS System Configuration
+# This is the default configuration file for the AALS system
+# Environment-specific overrides should be placed in environment-specific files
+
+system:
+  name: "AALS"
+  version: "0.1.0"
+  environment: "development"  # development, staging, production
+  debug: true
+  log_level: "INFO"
+
+# Database Configuration
+database:
+  # PostgreSQL connection (used for structured data)
+  postgres:
+    host: "localhost"
+    port: 5432
+    database: "aals"
+    username: "aals_user"
+    password: ""  # Set via environment variable AALS_DB_PASSWORD
+    
+  # Redis connection (used for caching and sessions)
+  redis:
+    host: "localhost"
+    port: 6379
+    database: 0
+    password: ""  # Set via environment variable AALS_REDIS_PASSWORD
+
+# Module Configuration
+modules:
+  # Module 1: Config Manager (always enabled)
+  config_manager:
+    enabled: true
+    
+  # Module 2: Slack Alert Reader
+  slack_alert_reader:
+    enabled: true
+    channels: ["#alerts", "#incidents", "#monitoring"]
+    max_messages: 100  # 最大取得メッセージ数
+    lookback_hours: 24  # 過去何時間分を取得
+    alert_keywords: ["CRITICAL", "WARNING", "ERROR", "DOWN", "FAILED"]
+    cache_ttl_seconds: 300  # キャッシュ有効時間（5分）
+    
+  # Module 3: Basic Logger
+  basic_logger:
+    enabled: true
+    # アプリケーションログ設定
+    app_log:
+      file: "logs/aals.log"
+      level: "INFO"
+      max_file_size: "10MB"
+      backup_count: 5
+      format: "json"  # json or text
+    # 監査ログ設定  
+    audit_log:
+      file: "logs/audit.log"
+      level: "INFO"
+      max_file_size: "50MB"
+      backup_count: 10
+      format: "json"
+      # 監査ログの保持期間（日数）
+      retention_days: 90
+    # コンソール出力設定
+    console:
+      enabled: true
+      level: "INFO" 
+      format: "text"  # development時は見やすいテキスト形式
+      colorize: true
+    # 開発モード設定
+    development:
+      detailed_traceback: true
+      log_sql_queries: false
+      log_api_requests: true
+    
+  # Module 4: Prometheus Analyzer
+  prometheus_analyzer:
+    enabled: false
+    endpoints: []
+    
+  # Module 5: GitHub Issues Searcher
+  github_searcher:
+    enabled: false
+    repositories: []
+    
+  # Module 6: LLM Wrapper
+  llm_wrapper:
+    enabled: false
+    providers: []
+
+# Security Configuration
+security:
+  # API Keys and secrets (set via environment variables)
+  secret_key: ""  # AALS_SECRET_KEY
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    
+  # Audit logging
+  audit:
+    enabled: true
+    log_file: "logs/audit.log"
+
+# Integration Configuration (populated as modules are implemented)
+integrations:
+  slack:
+    token: ""  # AALS_SLACK_TOKEN
+    
+  github:
+    token: ""  # AALS_GITHUB_TOKEN
+    
+  prometheus:
+    endpoints: []
+    
+  ssh:
+    key_file: ""
+    known_hosts_file: ""
+
+# Development/Testing Configuration
+development:
+  auto_reload: true
+  mock_external_apis: false
+  test_data_dir: "tests/fixtures"
