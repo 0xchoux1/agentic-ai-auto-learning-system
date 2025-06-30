@@ -74,13 +74,41 @@ modules:
     
   # Module 4: Prometheus Analyzer
   prometheus_analyzer:
-    enabled: false
-    endpoints: []
+    enabled: true
+    url: "http://localhost:9090"  # Prometheus server URL
+    timeout: 30  # HTTP timeout in seconds
+    # Threshold configuration for alerts
+    thresholds:
+      cpu_warning: 70.0      # CPU usage % warning
+      cpu_critical: 90.0     # CPU usage % critical
+      memory_warning: 80.0   # Memory usage % warning  
+      memory_critical: 95.0  # Memory usage % critical
+      disk_warning: 85.0     # Disk usage % warning
+      disk_critical: 95.0    # Disk usage % critical
+      load_warning: 4.0      # Load average warning
+      load_critical: 8.0     # Load average critical
+      response_warning: 2.0  # HTTP response time warning (seconds)
+      response_critical: 5.0 # HTTP response time critical (seconds)
+    # Query configuration
+    default_step: "1m"       # Default step for range queries
+    max_history_hours: 24    # Maximum hours of historical data
     
   # Module 5: GitHub Issues Searcher
-  github_searcher:
-    enabled: false
-    repositories: []
+  github_issues_searcher:
+    enabled: true
+    token: ""  # AALS_GITHUB_TOKEN - GitHub Personal Access Token
+    repositories: ["owner/repo1", "owner/repo2"]  # Default repositories to search
+    timeout: 30  # HTTP timeout in seconds
+    max_results: 50  # Maximum issues to fetch per repository
+    similarity_threshold: 0.3  # Minimum similarity score for issues to be considered similar
+    search_config:
+      include_closed: true  # Include closed issues in search
+      max_age_days: 365  # Maximum age of issues to consider (days)
+      priority_keywords:
+        critical: ["critical", "urgent", "emergency", "production down", "outage"]
+        high: ["high", "important", "blocker", "security breach"]
+        medium: ["medium", "bug", "performance"]
+        low: ["low", "enhancement", "documentation"]
     
   # Module 6: LLM Wrapper
   llm_wrapper:
