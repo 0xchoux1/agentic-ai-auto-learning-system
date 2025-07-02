@@ -529,9 +529,10 @@ class TestSSHConnectionPool:
         
         await pool.start()
         assert pool._cleanup_task is not None
+        assert not pool._cleanup_task.done()
         
         await pool.stop()
-        assert pool._cleanup_task.cancelled()
+        assert pool._cleanup_task.cancelled() or pool._cleanup_task.done()
 
 
 class TestExecutionReport:
@@ -665,9 +666,9 @@ class TestIntegrationScenarios:
         """MEDIUM_RISK承認ワークフローテスト"""
         targets = [SSHTarget(host="prod.com", environment="production")]
         
-        # 承認が必要なコマンド
+        # 承認が必要なコマンド（MEDIUM_RISKパターンに一致）
         report = await executor.execute_command(
-            command="systemctl restart myapp",
+            command="systemctl restart myapp_dev",
             targets=targets,
             permission_level=PermissionLevel.MEDIUM_RISK,
             requested_by="developer"

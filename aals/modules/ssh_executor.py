@@ -605,7 +605,7 @@ class SSHExecutor:
             resource=f"ssh_command_request:{command_request.request_id}",
             result="success",
             details=f"Command: {command_request.command[:100]}",
-            user=command_request.requested_by,
+            user_id=command_request.requested_by,
             risk_level=self._get_risk_level(command_request.permission_level)
         ))
         
@@ -701,7 +701,7 @@ class SSHExecutor:
             resource=f"ssh_command:{command_request.request_id}",
             result="success" if overall_status == ExecutionStatus.COMPLETED else "failure",
             details=f"Executed on {len(results)} targets, success rate: {report.to_dict()['success_rate']:.1%}",
-            user=command_request.requested_by,
+            user_id=command_request.requested_by,
             risk_level=self._get_risk_level(command_request.permission_level)
         ))
         
