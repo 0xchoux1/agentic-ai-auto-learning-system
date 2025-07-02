@@ -29,48 +29,6 @@ from aals.modules.llm_wrapper import IncidentAnalysisResult
 class TestAlertCorrelator:
     """Alert Correlator基本テスト"""
     
-    @pytest.fixture
-    def mock_config(self):
-        """モック設定"""
-        config = Mock()
-        config.config = {
-            "correlation_window_minutes": 30,
-            "confidence_threshold": 0.7,
-            "max_correlations_per_window": 10,
-            "correlation_rules": []
-        }
-        return config
-    
-    @pytest.fixture
-    def mock_modules(self):
-        """依存モジュールのモック"""
-        return {
-            "slack_reader": Mock(),
-            "prometheus_analyzer": Mock(), 
-            "github_searcher": Mock(),
-            "llm_wrapper": Mock()
-        }
-    
-    @pytest.fixture
-    def correlator(self, mock_config, mock_modules):
-        """Alert Correlatorインスタンス"""
-        with patch('aals.modules.alert_correlator.get_config_manager') as mock_config_manager:
-            mock_config_manager.return_value.get_module_config.return_value = mock_config
-            
-            with patch.multiple(
-                'aals.modules.alert_correlator',
-                SlackAlertReader=Mock(return_value=mock_modules["slack_reader"]),
-                PrometheusAnalyzer=Mock(return_value=mock_modules["prometheus_analyzer"]),
-                GitHubIssuesSearcher=Mock(return_value=mock_modules["github_searcher"]),
-                LLMWrapper=Mock(return_value=mock_modules["llm_wrapper"])
-            ):
-                correlator = AlertCorrelator()
-                correlator.slack_reader = mock_modules["slack_reader"]
-                correlator.prometheus_analyzer = mock_modules["prometheus_analyzer"]
-                correlator.github_searcher = mock_modules["github_searcher"]
-                correlator.llm_wrapper = mock_modules["llm_wrapper"]
-                return correlator
-    
     def test_initialization(self, correlator):
         """初期化テスト"""
         assert correlator.correlation_window_minutes == 30
@@ -119,96 +77,6 @@ class TestAlertCorrelator:
 
 class TestAlertContextCollection:
     """アラートコンテキスト収集テスト"""
-    
-    @pytest.fixture
-    def mock_config(self):
-        """モック設定"""
-        config = Mock()
-        config.config = {
-            "correlation_window_minutes": 30,
-            "confidence_threshold": 0.7,
-            "max_correlations_per_window": 10,
-            "correlation_rules": []
-        }
-        return config
-    
-    @pytest.fixture
-    def mock_modules(self):
-        """依存モジュールのモック"""
-        return {
-            "slack_reader": Mock(),
-            "prometheus_analyzer": Mock(), 
-            "github_searcher": Mock(),
-            "llm_wrapper": Mock()
-        }
-    
-    @pytest.fixture
-    def correlator(self, mock_config, mock_modules):
-        """Alert Correlatorインスタンス"""
-        with patch('aals.modules.alert_correlator.get_config_manager') as mock_config_manager:
-            mock_config_manager.return_value.get_module_config.return_value = mock_config
-            
-            with patch.multiple(
-                'aals.modules.alert_correlator',
-                SlackAlertReader=Mock(return_value=mock_modules["slack_reader"]),
-                PrometheusAnalyzer=Mock(return_value=mock_modules["prometheus_analyzer"]),
-                GitHubIssuesSearcher=Mock(return_value=mock_modules["github_searcher"]),
-                LLMWrapper=Mock(return_value=mock_modules["llm_wrapper"])
-            ):
-                correlator = AlertCorrelator()
-                correlator.slack_reader = mock_modules["slack_reader"]
-                correlator.prometheus_analyzer = mock_modules["prometheus_analyzer"]
-                correlator.github_searcher = mock_modules["github_searcher"]
-                correlator.llm_wrapper = mock_modules["llm_wrapper"]
-                return correlator
-    
-    @pytest.fixture
-    def sample_slack_messages(self):
-        """サンプルSlackメッセージ"""
-        return [
-            SlackMessage(
-                channel="C123",
-                channel_name="#alerts",
-                timestamp="1234567890.123",
-                text="CRITICAL: API response time exceeding 5 seconds",
-                user="monitoring-bot",
-                thread_ts=None,
-                reactions=[],
-                message_url="https://slack.com/message1",
-                datetime=datetime.now() - timedelta(minutes=5),
-                is_alert=True,
-                alert_level="critical"
-            ),
-            SlackMessage(
-                channel="C123", 
-                channel_name="#alerts",
-                timestamp="1234567891.123",
-                text="INFO: Deployment completed successfully",
-                user="deploy-bot",
-                thread_ts=None,
-                reactions=[],
-                message_url="https://slack.com/message2",
-                datetime=datetime.now() - timedelta(minutes=10),
-                is_alert=False,
-                alert_level="info"
-            )
-        ]
-    
-    @pytest.fixture
-    def sample_prometheus_alerts(self):
-        """サンプルPrometheusアラート"""
-        return [
-            AlertEvent(
-                metric_name="cpu_usage_percent",
-                current_value=85.5,
-                threshold_value=80.0,
-                severity=AlertSeverity.WARNING,
-                timestamp=datetime.now() - timedelta(minutes=3),
-                labels={"instance": "web-01"},
-                message="CPU usage is above warning threshold",
-                comparison=">"
-            )
-        ]
     
     @pytest.mark.asyncio
     async def test_collect_alert_contexts(self, correlator, sample_slack_messages, sample_prometheus_alerts):
@@ -275,46 +143,6 @@ class TestAlertContextCollection:
 class TestCorrelationAnalysis:
     """相関分析テスト"""
     
-    @pytest.fixture
-    def sample_contexts(self):
-        """サンプルコンテキスト"""
-        now = datetime.now()
-        return [
-            AlertContext(
-                source="slack",
-                timestamp=now - timedelta(minutes=5),
-                severity="critical",
-                content={
-                    "message": "API response time critical",
-                    "channel": "#alerts",
-                    "keywords": ["api", "critical", "response"]
-                },
-                confidence=0.8
-            ),
-            AlertContext(
-                source="prometheus",
-                timestamp=now - timedelta(minutes=3),
-                severity="warning",
-                content={
-                    "metric_name": "http_response_time_seconds",
-                    "current_value": 6.2,
-                    "threshold_value": 5.0,
-                    "trend": "increasing"
-                },
-                confidence=0.9
-            ),
-            AlertContext(
-                source="prometheus",
-                timestamp=now - timedelta(minutes=2),
-                severity="critical",
-                content={
-                    "metric_name": "cpu_usage_percent",
-                    "current_value": 95.0,
-                    "threshold_value": 90.0
-                },
-                confidence=0.9
-            )
-        ]
     
     def test_analyze_correlations(self, correlator, sample_contexts):
         """相関分析テスト"""
@@ -410,80 +238,8 @@ class TestCorrelationAnalysis:
 class TestRecommendationGeneration:
     """推奨アクション生成テスト"""
     
-    @pytest.fixture
-    def sample_correlation(self):
-        """サンプル相関"""
-        now = datetime.now()
-        contexts = [
-            AlertContext(
-                source="slack",
-                timestamp=now - timedelta(minutes=5),
-                severity="critical",
-                content={"message": "API down", "keywords": ["api", "critical"]},
-                confidence=0.9
-            )
-        ]
-        
-        return CorrelatedAlert(
-            correlation_id="test_corr_123",
-            primary_source="slack",
-            related_sources=["prometheus"],
-            severity=IncidentSeverity.CRITICAL,
-            confidence_score=0.85,
-            time_window=(now - timedelta(minutes=10), now),
-            alert_contexts=contexts,
-            correlation_evidence={"rule_name": "test_rule"},
-            estimated_impact={"user_impact_level": "high"}
-        )
     
-    @pytest.fixture
-    def sample_llm_analysis(self):
-        """サンプルLLM分析"""
-        return IncidentAnalysisResult(
-            root_cause="High API response times due to database overload",
-            mitigation_steps=[
-                "Scale database connections",
-                "Implement connection pooling",
-                "Add caching layer"
-            ],
-            prevention_strategies=[
-                "Monitor database performance",
-                "Implement auto-scaling",
-                "Regular performance testing"
-            ],
-            related_patterns=["database_overload", "api_performance"],
-            severity_assessment="CRITICAL",
-            estimated_impact="200+ users affected",
-            confidence_score=0.85
-        )
     
-    @pytest.fixture
-    def sample_similar_cases(self):
-        """サンプル類似ケース"""
-        issue = GitHubIssue(
-            number=123,
-            title="API performance degradation", 
-            body="Similar API issue resolved",
-            state="closed",
-            labels=["bug", "performance"],
-            assignees=["dev-team"],
-            created_at=datetime.now() - timedelta(days=5),
-            updated_at=datetime.now() - timedelta(days=3),
-            closed_at=datetime.now() - timedelta(days=2),
-            author="system",
-            comments_count=5,
-            url="https://github.com/repo/issues/123",
-            repository="company/api",
-            priority=IssuePriority.HIGH,
-            resolution_time=timedelta(hours=8)
-        )
-        
-        return [SimilarIssue(
-            issue=issue,
-            similarity_score=0.8,
-            matching_keywords=["api", "performance"],
-            relevance_reason="Similar API performance issue"
-        )]
     
     @pytest.mark.asyncio
     async def test_generate_integrated_recommendations(
@@ -558,35 +314,7 @@ class TestRecommendationGeneration:
 class TestEscalationDecision:
     """エスカレーション判定テスト"""
     
-    @pytest.fixture
-    def critical_correlation(self):
-        """クリティカル相関"""
-        return CorrelatedAlert(
-            correlation_id="critical_123",
-            primary_source="slack",
-            related_sources=["prometheus", "github"],
-            severity=IncidentSeverity.CRITICAL,
-            confidence_score=0.9,
-            time_window=(datetime.now() - timedelta(minutes=10), datetime.now()),
-            alert_contexts=[],
-            correlation_evidence={},
-            estimated_impact={}
-        )
     
-    @pytest.fixture
-    def medium_correlation(self):
-        """中程度相関"""
-        return CorrelatedAlert(
-            correlation_id="medium_123",
-            primary_source="prometheus",
-            related_sources=[],
-            severity=IncidentSeverity.MEDIUM,
-            confidence_score=0.8,
-            time_window=(datetime.now() - timedelta(minutes=5), datetime.now()),
-            alert_contexts=[],
-            correlation_evidence={},
-            estimated_impact={}
-        )
     
     def test_escalation_decision_critical(self, correlator, critical_correlation):
         """クリティカルエスカレーション判定テスト"""

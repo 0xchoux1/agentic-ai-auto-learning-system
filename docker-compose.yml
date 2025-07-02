@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aals-postgres
+    environment:
+      POSTGRES_DB: aals
+      POSTGRES_USER: aals_user
+      POSTGRES_PASSWORD: ${AALS_DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aals_user -d aals"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: aals-redis
+    command: redis-server --requirepass ${AALS_REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # AALS Application
+  aals:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aals-app
+    environment:
+      # Core settings
+      AALS_ENVIRONMENT: production
+      AALS_SECRET_KEY: ${AALS_SECRET_KEY}
+      AALS_DEBUG: "false"
+      
+      # Database
+      AALS_DB_HOST: postgres
+      AALS_DB_PORT: 5432
+      AALS_DB_NAME: aals
+      AALS_DB_USER: aals_user
+      AALS_DB_PASSWORD: ${AALS_DB_PASSWORD}
+      
+      # Redis
+      AALS_REDIS_HOST: redis
+      AALS_REDIS_PORT: 6379
+      AALS_REDIS_PASSWORD: ${AALS_REDIS_PASSWORD}
+      
+      # API Keys
+      AALS_SLACK_TOKEN: ${AALS_SLACK_TOKEN}
+      AALS_GITHUB_TOKEN: ${AALS_GITHUB_TOKEN}
+      AALS_CLAUDE_API_KEY: ${AALS_CLAUDE_API_KEY}
+      
+      # Monitoring
+      AALS_PROMETHEUS_URL: ${AALS_PROMETHEUS_URL:-http://prometheus:9090}
+      
+      # Logging
+      AALS_LOG_LEVEL: ${AALS_LOG_LEVEL:-INFO}
+      AALS_LOG_FORMAT: json
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - aals_data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Prometheus (optional, for monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aals-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana (optional, for visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aals-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  aals_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: aals-network
