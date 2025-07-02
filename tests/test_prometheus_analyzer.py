@@ -230,7 +230,9 @@ class TestPrometheusAnalyzer:
         """セットアップ確認失敗テスト"""
         with patch('aals.modules.prometheus_analyzer.PrometheusAPIClient') as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.verify_connection.return_value = False
+            mock_client.verify_connection = AsyncMock(return_value=False)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
             
             result = await prometheus_analyzer.verify_setup()
@@ -327,9 +329,7 @@ class TestPrometheusAnalyzer:
         """現在メトリクス取得テスト"""
         with patch('aals.modules.prometheus_analyzer.PrometheusAPIClient') as mock_client_class:
             mock_client = AsyncMock()
-            
-            # モックレスポンス設定
-            mock_result = PrometheusQueryResult(
+            mock_client.query_instant = AsyncMock(return_value=PrometheusQueryResult(
                 status="success",
                 data={
                     "resultType": "vector",
@@ -340,18 +340,17 @@ class TestPrometheusAnalyzer:
                         }
                     ]
                 }
-            )
-            
-            mock_client.query_instant.return_value = mock_result
-            mock_client.parse_instant_result.return_value = [
+            ))
+            mock_client.parse_instant_result = MagicMock(return_value=[
                 PrometheusMetric(
                     metric_name="cpu_usage",
                     labels={"instance": "server01"},
                     timestamp=datetime.now(),
                     value=75.5
                 )
-            ]
-            
+            ])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
             
             metrics = await prometheus_analyzer.get_current_metrics(["cpu_usage"])
@@ -364,8 +363,6 @@ class TestPrometheusAnalyzer:
     async def test_get_metric_history(self, prometheus_analyzer):
         """メトリクス履歴取得テスト"""
         with patch('aals.modules.prometheus_analyzer.PrometheusAPIClient') as mock_client_class:
-            mock_client = AsyncMock()
-            
             # モック履歴データ
             now = datetime.now()
             values = [(now - timedelta(minutes=i), 50.0 + i) for i in range(10)]
@@ -376,10 +373,11 @@ class TestPrometheusAnalyzer:
                 values=values
             )
             
-            mock_result = PrometheusQueryResult(status="success", data={})
-            mock_client.query_range.return_value = mock_result
-            mock_client.parse_range_result.return_value = [mock_range]
-            
+            mock_client = AsyncMock()
+            mock_client.query_range = AsyncMock(return_value=PrometheusQueryResult(status="success", data={}))
+            mock_client.parse_range_result = MagicMock(return_value=[mock_range])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
             
             history = await prometheus_analyzer.get_metric_history("cpu_usage", hours_back=1)

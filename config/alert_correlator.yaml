@@ -1,0 +1,170 @@
+# AALS Module 7: Alert Correlator Configuration
+module:
+  name: "alert_correlator"
+  enabled: true
+  dependencies: ["slack_alert_reader", "prometheus_analyzer", "github_issues_searcher", "llm_wrapper"]
+
+# 相関分析設定
+correlation:
+  # 相関分析時間窓（分）
+  correlation_window_minutes: 30
+  
+  # 信頼度閾値（0.0-1.0）
+  confidence_threshold: 0.7
+  
+  # 1つの時間窓で処理する最大相関数
+  max_correlations_per_window: 10
+  
+  # 相関重複排除時間（秒）
+  deduplication_window_seconds: 300
+
+# 相関ルール定義
+correlation_rules:
+  - name: "prometheus_slack_high_severity"
+    description: "Prometheus critical alerts with Slack emergency notifications"
+    enabled: true
+    weight: 0.9
+    time_window_minutes: 10
+    conditions:
+      - source: "prometheus"
+        severity: ["critical"]
+      - source: "slack"
+        alert_level: ["critical"]
+        keywords: ["down", "outage", "emergency", "critical"]
+  
+  - name: "api_performance_degradation"
+    description: "API performance issues across multiple sources"
+    enabled: true
+    weight: 0.8
+    time_window_minutes: 15
+    conditions:
+      - source: "prometheus"
+        keywords: ["http", "api", "response_time"]
+        severity: ["warning", "critical"]
+      - source: "slack"
+        keywords: ["api", "slow", "timeout", "response"]
+  
+  - name: "database_performance_pattern"
+    description: "Database performance correlation pattern"
+    enabled: true
+    weight: 0.7
+    time_window_minutes: 20
+    conditions:
+      - source: "prometheus"
+        keywords: ["database", "mysql", "postgres", "connection"]
+      - source: "slack"
+        keywords: ["database", "db", "connection", "query"]
+  
+  - name: "infrastructure_scaling_need"
+    description: "Infrastructure scaling requirement detection"
+    enabled: true
+    weight: 0.6
+    time_window_minutes: 60
+    conditions:
+      - source: "prometheus"
+        keywords: ["cpu", "memory", "disk"]
+        severity: ["warning", "critical"]
+      - source: "github"
+        similar_issues:
+          min_count: 1
+          keywords: ["performance", "scaling", "resource"]
+
+# エスカレーション設定
+escalation:
+  # 自動エスカレーション有効化
+  auto_escalation_enabled: true
+  
+  # エスカレーション時間制限（分）
+  time_limits:
+    emergency: 5
+    immediate_action: 15
+    human_review: 60
+    monitor_only: null
+    auto_resolve: null
+  
+  # 通知設定
+  notifications:
+    emergency:
+      channels: ["#incidents", "#critical-alerts"]
+      users: ["@oncall", "@incident-commander"]
+      escalate_after_minutes: 5
+    
+    immediate_action:
+      channels: ["#incidents", "#alerts"]
+      users: ["@oncall"]
+      escalate_after_minutes: 15
+    
+    human_review:
+      channels: ["#alerts"]
+      users: ["@sre-team"]
+      escalate_after_minutes: 60
+
+# 推奨アクション設定
+recommendations:
+  # LLM分析の重み
+  llm_analysis_weight: 0.8
+  
+  # GitHub類似ケース検索設定
+  similar_cases:
+    max_results: 5
+    similarity_threshold: 0.6
+    time_window_days: 90
+  
+  # 自動化候補の閾値
+  automation_thresholds:
+    confidence_min: 0.8
+    severity_max: "medium"  # medium以下で自動化検討
+  
+  # 解決時間推定設定
+  resolution_time_estimates:
+    critical: 60    # 分
+    high: 120
+    medium: 240
+    low: 480
+    info: 1440
+
+# パフォーマンス設定
+performance:
+  # 並行処理設定
+  max_concurrent_correlations: 5
+  max_concurrent_llm_requests: 3
+  
+  # キャッシュ設定
+  correlation_cache_ttl_minutes: 60
+  similar_cases_cache_ttl_minutes: 1440  # 24時間
+  
+  # タイムアウト設定
+  llm_analysis_timeout_seconds: 30
+  github_search_timeout_seconds: 15
+  prometheus_query_timeout_seconds: 10
+
+# ログとモニタリング
+monitoring:
+  # 詳細ログ有効化
+  detailed_logging: true
+  
+  # パフォーマンスメトリクス収集
+  performance_metrics: true
+  
+  # 統計情報保持期間（日）
+  stats_retention_days: 30
+  
+  # アラート設定
+  alerts:
+    correlation_processing_time_threshold_seconds: 60
+    failed_correlation_rate_threshold: 0.1
+    low_confidence_correlation_rate_threshold: 0.3
+
+# 品質保証設定
+quality_assurance:
+  # 最小信頼度
+  minimum_confidence: 0.5
+  
+  # 最大同時アクティブ相関数
+  max_active_correlations: 50
+  
+  # 相関の自動クリーンアップ（時間）
+  correlation_cleanup_hours: 24
+  
+  # 品質メトリクス追跡
+  track_quality_metrics: true

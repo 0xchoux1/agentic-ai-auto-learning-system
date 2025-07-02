@@ -1,0 +1,367 @@
+# AALS Module 9: Response Orchestrator Configuration
+module:
+  name: "response_orchestrator"
+  enabled: true
+  dependencies: ["slack_alert_reader", "prometheus_analyzer", "github_issues_searcher", "llm_wrapper", "alert_correlator", "ssh_executor"]
+
+# ワークフロー設定
+workflow:
+  # デフォルトワークフロータイプ
+  default_types:
+    - "incident_response"
+    - "performance_investigation"
+    - "system_maintenance"
+    - "security_audit"
+  
+  # ワークフロー実行設定
+  execution:
+    max_concurrent_workflows: 10
+    max_steps_per_workflow: 50
+    default_step_timeout_minutes: 30
+    workflow_timeout_hours: 24
+    
+  # 自動化レベル設定
+  automation_levels:
+    manual:
+      description: "Complete manual control"
+      auto_execute: false
+      require_approval: true
+      
+    semi_auto:
+      description: "Semi-automatic with approval"
+      auto_execute: false
+      require_approval: true
+      auto_approve_read_only: true
+      
+    auto_monitor:
+      description: "Automatic execution with monitoring"
+      auto_execute: true
+      require_approval: false
+      auto_approve_up_to: "medium_risk"
+      
+    full_auto:
+      description: "Full automation"
+      auto_execute: true
+      require_approval: false
+      auto_approve_up_to: "high_risk"
+
+# ワークフローテンプレート設定
+templates:
+  # インシデント対応テンプレート
+  incident_response:
+    name: "Standard Incident Response"
+    description: "Multi-phase incident response workflow"
+    automation_level: "semi_auto"
+    priority: 1
+    estimated_duration_minutes: 120
+    
+    phases:
+      detection:
+        timeout_minutes: 5
+        required_modules: ["slack_alert_reader", "prometheus_analyzer"]
+        auto_execute: true
+        
+      correlation:
+        timeout_minutes: 10
+        required_modules: ["alert_correlator"]
+        auto_execute: true
+        
+      analysis:
+        timeout_minutes: 15
+        required_modules: ["llm_wrapper", "github_issues_searcher"]
+        auto_execute: true
+        
+      planning:
+        timeout_minutes: 20
+        required_modules: ["alert_correlator"]
+        auto_execute: false
+        require_approval: true
+        
+      execution:
+        timeout_minutes: 60
+        required_modules: ["ssh_executor"]
+        auto_execute: false
+        require_approval: true
+        
+      monitoring:
+        timeout_minutes: 30
+        required_modules: ["prometheus_analyzer"]
+        auto_execute: true
+
+  # パフォーマンス調査テンプレート
+  performance_investigation:
+    name: "Performance Investigation"
+    description: "System performance analysis workflow"
+    automation_level: "auto_monitor"
+    priority: 3
+    estimated_duration_minutes: 60
+    
+    phases:
+      metric_collection:
+        timeout_minutes: 10
+        required_modules: ["prometheus_analyzer"]
+        auto_execute: true
+        
+      trend_analysis:
+        timeout_minutes: 15
+        required_modules: ["prometheus_analyzer", "llm_wrapper"]
+        auto_execute: true
+        
+      similar_case_search:
+        timeout_minutes: 10
+        required_modules: ["github_issues_searcher"]
+        auto_execute: true
+        
+      recommendation_generation:
+        timeout_minutes: 15
+        required_modules: ["alert_correlator"]
+        auto_execute: true
+        
+      report_generation:
+        timeout_minutes: 10
+        auto_execute: true
+
+# 承認設定
+approval:
+  # 段階別承認者
+  approval_hierarchy:
+    level_1:
+      approvers: ["sre-team"]
+      auto_approve_patterns:
+        - "read_only_commands"
+        - "monitoring_actions"
+        
+    level_2:
+      approvers: ["sre-team", "team-lead"]
+      required_for:
+        - "medium_risk_actions"
+        - "production_changes"
+        
+    level_3:
+      approvers: ["sre-team", "team-lead", "on-call-engineer"]
+      required_for:
+        - "critical_actions"
+        - "data_modifications"
+  
+  # 承認タイムアウト
+  approval_timeout_minutes: 60
+  
+  # 緊急時バイパス
+  emergency_bypass:
+    enabled: true
+    severity_threshold: "critical"
+    max_bypass_per_day: 3
+    required_post_approval: true
+
+# 実行制御設定
+execution:
+  # 並列実行制限
+  concurrency:
+    max_parallel_workflows: 5
+    max_parallel_steps: 10
+    resource_based_throttling: true
+    
+  # リトライ設定
+  retry:
+    enabled: true
+    max_attempts: 3
+    exponential_backoff: true
+    base_delay_seconds: 5
+    
+  # タイムアウト設定
+  timeouts:
+    step_timeout_minutes: 30
+    workflow_timeout_hours: 4
+    approval_timeout_minutes: 60
+    
+  # エラーハンドリング
+  error_handling:
+    continue_on_error: false
+    rollback_on_failure: true
+    notify_on_error: true
+
+# 通知設定
+notifications:
+  # ワークフロー開始通知
+  workflow_start:
+    enabled: true
+    channels: ["#sre-workflows"]
+    include_details: true
+    
+  # 承認要求通知
+  approval_requests:
+    enabled: true
+    channels: ["#sre-approvals"]
+    mention_approvers: true
+    escalation_timeout_minutes: 30
+    
+  # 完了通知
+  workflow_completion:
+    enabled: true
+    channels: ["#sre-workflows"]
+    summary_included: true
+    
+  # エラー通知
+  errors:
+    enabled: true
+    channels: ["#sre-alerts"]
+    immediate_notification: true
+    include_context: true
+
+# ダッシュボード設定
+dashboard:
+  # リアルタイム更新
+  real_time_updates:
+    enabled: true
+    update_interval_seconds: 30
+    websocket_enabled: true
+    
+  # メトリクス表示
+  metrics:
+    workflow_success_rate: true
+    average_resolution_time: true
+    active_workflows_count: true
+    pending_approvals_count: true
+    resource_utilization: true
+    
+  # 履歴保持
+  history:
+    retention_days: 90
+    max_workflows_displayed: 100
+    pagination_size: 20
+    
+  # フィルター設定
+  filters:
+    by_severity: true
+    by_status: true
+    by_automation_level: true
+    by_module: true
+    date_range: true
+
+# 統合設定
+integrations:
+  # 外部システム統合
+  external_systems:
+    # PagerDuty統合
+    pagerduty:
+      enabled: false
+      api_token: null
+      auto_create_incidents: false
+      
+    # Jira統合
+    jira:
+      enabled: false
+      server_url: null
+      auto_create_tickets: false
+      
+    # Datadog統合
+    datadog:
+      enabled: false
+      api_key: null
+      track_workflow_metrics: false
+  
+  # 内部モジュール統合
+  internal_modules:
+    alert_correlator:
+      auto_trigger_workflows: true
+      correlation_threshold: 0.8
+      
+    ssh_executor:
+      execution_approval_required: true
+      audit_all_commands: true
+      
+    prometheus_analyzer:
+      metric_thresholds_monitoring: true
+      auto_scaling_triggers: false
+
+# セキュリティ設定
+security:
+  # アクセス制御
+  access_control:
+    role_based_access: true
+    workflow_isolation: true
+    audit_all_actions: true
+    
+  # データ保護
+  data_protection:
+    encrypt_sensitive_data: true
+    mask_credentials: true
+    secure_communication: true
+    
+  # 監査ログ
+  audit_logging:
+    enabled: true
+    log_all_actions: true
+    retention_days: 365
+    include_payload: false
+
+# パフォーマンス設定
+performance:
+  # キューイング
+  queuing:
+    max_queue_size: 1000
+    priority_queuing: true
+    queue_timeout_minutes: 30
+    
+  # キャッシング
+  caching:
+    enabled: true
+    workflow_template_cache_minutes: 60
+    module_status_cache_seconds: 30
+    
+  # リソース管理
+  resource_management:
+    memory_limit_mb: 2048
+    cpu_limit_percent: 80
+    disk_usage_threshold_percent: 85
+    
+  # メトリクス収集
+  metrics_collection:
+    enabled: true
+    collection_interval_seconds: 60
+    export_prometheus: true
+
+# 高度な設定
+advanced:
+  # カスタムワークフロー
+  custom_workflows:
+    enabled: true
+    max_custom_workflows: 10
+    validation_required: true
+    
+  # プラグインシステム
+  plugins:
+    enabled: false
+    plugin_directory: "./plugins"
+    auto_load: false
+    
+  # 実験的機能
+  experimental:
+    ai_workflow_optimization: false
+    predictive_scaling: false
+    auto_workflow_generation: false
+    
+  # デバッグ設定
+  debugging:
+    verbose_logging: false
+    step_by_step_execution: false
+    workflow_state_snapshots: false
+
+# 環境別設定
+environments:
+  development:
+    automation_level: "manual"
+    approval_required: false
+    notification_channels: ["#dev-testing"]
+    
+  staging:
+    automation_level: "semi_auto"
+    approval_required: true
+    notification_channels: ["#staging-workflows"]
+    
+  production:
+    automation_level: "semi_auto"
+    approval_required: true
+    approval_hierarchy: "level_3"
+    notification_channels: ["#prod-workflows", "#sre-alerts"]
+    emergency_bypass_enabled: true

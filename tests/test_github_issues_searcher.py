@@ -315,12 +315,16 @@ class TestGitHubIssuesSearcher:
         """検索エラーハンドリングテスト"""
         with patch.object(github_issues_searcher.github_client, 'search_issues', 
                          side_effect=Exception("API Error")):
-            with pytest.raises(Exception):
-                await github_issues_searcher.search_similar_issues(
-                    description="Test",
-                    keywords=["test"],
-                    repositories=["owner/repo"]  # 単一リポジトリを指定
-                )
+            # エラーハンドリングされて正常終了するか確認
+            result = await github_issues_searcher.search_similar_issues(
+                description="Test",
+                keywords=["test"],
+                repositories=["owner/repo"]  # 単一リポジトリを指定
+            )
+            # エラーハンドリングで空の結果が返される
+            assert result.similar_issues == []
+            assert result.incident_patterns == []
+            assert len(result.suggested_solutions) > 0  # 解決策は生成される
     
     def test_to_dict(self, github_issues_searcher, sample_github_issues):
         """辞書変換テスト"""
